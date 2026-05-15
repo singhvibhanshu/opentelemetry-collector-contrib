@@ -14,7 +14,6 @@ import (
 	conventionsv116 "go.opentelemetry.io/otel/semconv/v1.16.0"
 	conventionsv118 "go.opentelemetry.io/otel/semconv/v1.18.0"
 	conventionsv119 "go.opentelemetry.io/otel/semconv/v1.19.0"
-	conventionsv120 "go.opentelemetry.io/otel/semconv/v1.20.0"
 	conventionsv121 "go.opentelemetry.io/otel/semconv/v1.21.0"
 	conventionsv125 "go.opentelemetry.io/otel/semconv/v1.25.0"
 	conventionsv126 "go.opentelemetry.io/otel/semconv/v1.26.0"
@@ -321,7 +320,12 @@ func appendHTTPServerAttributes(includeStatus bool, attrMap pcommon.Map) {
 	attrMap.PutStr(string(conventionsv118.HTTPUserAgentKey),
 		"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.138 Safari/537.36")
 	attrMap.PutStr(string(conventions.HTTPRouteKey), "/blog/posts")
-	attrMap.PutStr(string(conventionsv120.HTTPClientIPKey), "2001:506:71f0:16e::1")
+	if !metadata.InternalCoreinternalGoldendatasetDontEmitV0NetworkConventionsFeatureGate.IsEnabled() {
+		attrMap.PutStr("http.client_ip", "2001:506:71f0:16e::1")
+	}
+	if metadata.InternalCoreinternalGoldendatasetEmitV1NetworkConventionsFeatureGate.IsEnabled() {
+		attrMap.PutStr(string(conventions.ClientAddressKey), "2001:506:71f0:16e::1")
+	}
 	attrMap.PutStr(string(conventionsv126.EnduserIDKey), "unittest")
 }
 
@@ -417,7 +421,12 @@ func appendMaxCountAttributes(includeStatus bool, attrMap pcommon.Map) {
 	attrMap.PutStr(string(conventionsv118.HTTPUserAgentKey),
 		"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.138 Safari/537.36")
 	attrMap.PutStr(string(conventions.HTTPRouteKey), "/blog/posts")
-	attrMap.PutStr(string(conventionsv120.HTTPClientIPKey), "2600:1700:1f00:11c0:1ced:afa5:fd77:9d01")
+	if !metadata.InternalCoreinternalGoldendatasetDontEmitV0NetworkConventionsFeatureGate.IsEnabled() {
+		attrMap.PutStr("http.client_ip", "2600:1700:1f00:11c0:1ced:afa5:fd77:9d01")
+	}
+	if metadata.InternalCoreinternalGoldendatasetEmitV1NetworkConventionsFeatureGate.IsEnabled() {
+		attrMap.PutStr(string(conventions.ClientAddressKey), "2600:1700:1f00:11c0:1ced:afa5:fd77:9d01")
+	}
 	if !metadata.InternalCoreinternalGoldendatasetDontEmitV0RPCConventionsFeatureGate.IsEnabled() {
 		attrMap.PutStr(string(conventionsv138.PeerServiceKey), "IdentifyImageService")
 	}
