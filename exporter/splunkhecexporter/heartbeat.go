@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 
+	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/splunkhecexporter/internal/metadata"
 	translator "github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/splunk"
 )
 
@@ -35,7 +36,45 @@ func getMetricsName(overrides map[string]string, metricName string) string {
 	return metricName
 }
 
-func newHeartbeater(config *Config, buildInfo component.BuildInfo, pushLogFn func(ctx context.Context, ld plog.Logs) error, meter metric.Meter) *heartbeater {
+// newHeartbeatCounters returns the counters used to record heartbeat telemetry.
+//
+// By default the metric definitions live in metadata.yaml and the instruments
+// come from the generated TelemetryBuilder, so the metric names and metadata
+// are controlled by mdatagen. When the deprecated telemetry.override_metrics_names
+// option is set, mdatagen cannot express the custom names (they are baked in at
+// generation time), so we fall back to building the instruments manually to
+// preserve backwards compatibility.
+func newHeartbeatCounters(config *Config, telemetrySettings component.TelemetrySettings) (heartbeatsSent, heartbeatsFailed metric.Int64Counter, err error) {
+	if len(config.Telemetry.OverrideMetricsNames) > 0 {
+		overrides := config.Telemetry.OverrideMetricsNames
+		meter := metadata.Meter(telemetrySettings)
+		heartbeatsSent, err = meter.Int64Counter(
+			getMetricsName(overrides, defaultHBSentMetricsName),
+			metric.WithDescription("number of heartbeats sent"),
+			metric.WithUnit("1"),
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+		heartbeatsFailed, err = meter.Int64Counter(
+			getMetricsName(overrides, defaultHBFailedMetricsName),
+			metric.WithDescription("number of heartbeats failed"),
+			metric.WithUnit("1"),
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+		return heartbeatsSent, heartbeatsFailed, nil
+	}
+
+	tb, err := metadata.NewTelemetryBuilder(telemetrySettings)
+	if err != nil {
+		return nil, nil, err
+	}
+	return tb.ExporterSplunkhecHeartbeatsSent, tb.ExporterSplunkhecHeartbeatsFailed, nil
+}
+
+func newHeartbeater(config *Config, buildInfo component.BuildInfo, pushLogFn func(ctx context.Context, ld plog.Logs) error, telemetrySettings component.TelemetrySettings) *heartbeater {
 	interval := config.Heartbeat.Interval
 	if interval == 0 {
 		return nil
@@ -44,31 +83,17 @@ func newHeartbeater(config *Config, buildInfo component.BuildInfo, pushLogFn fun
 	var heartbeatsSent, heartbeatsFailed metric.Int64Counter
 	var attrs attribute.Set
 	if config.Telemetry.Enabled {
-		overrides := config.Telemetry.OverrideMetricsNames
-		extraAttributes := config.Telemetry.ExtraAttributes
-		var tags []attribute.KeyValue
-		for key, val := range extraAttributes {
-			tags = append(tags, attribute.String(key, val))
-		}
-		attrs = attribute.NewSet(tags...)
 		var err error
-		heartbeatsSent, err = meter.Int64Counter(
-			getMetricsName(overrides, defaultHBSentMetricsName),
-			metric.WithDescription("number of heartbeats sent"),
-			metric.WithUnit("1"),
-		)
+		heartbeatsSent, heartbeatsFailed, err = newHeartbeatCounters(config, telemetrySettings)
 		if err != nil {
 			return nil
 		}
 
-		heartbeatsFailed, err = meter.Int64Counter(
-			getMetricsName(overrides, defaultHBFailedMetricsName),
-			metric.WithDescription("number of heartbeats failed"),
-			metric.WithUnit("1"),
-		)
-		if err != nil {
-			return nil
+		var tags []attribute.KeyValue
+		for key, val := range config.Telemetry.ExtraAttributes {
+			tags = append(tags, attribute.String(key, val))
 		}
+		attrs = attribute.NewSet(tags...)
 	}
 
 	hbter := &heartbeater{

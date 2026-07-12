@@ -23,11 +23,9 @@ import (
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/pprofile"
 	"go.opentelemetry.io/collector/pdata/ptrace"
-	"go.opentelemetry.io/otel/metric"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
 
-	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/splunkhecexporter/internal/metadata"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/internal/splunk"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/pprof"
 	translator "github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/splunk"
@@ -61,7 +59,6 @@ type client struct {
 	heartbeater       *heartbeater
 	bufferPool        bufferPool
 	exporterName      string
-	meter             metric.Meter
 }
 
 func newClient(set exporter.Settings, cfg *Config, maxContentLength uint) *client {
@@ -72,7 +69,6 @@ func newClient(set exporter.Settings, cfg *Config, maxContentLength uint) *clien
 		buildInfo:         set.BuildInfo,
 		bufferPool:        newBufferPool(maxContentLength, !cfg.DisableCompression),
 		exporterName:      set.ID.String(),
-		meter:             metadata.Meter(set.TelemetrySettings),
 	}
 }
 
@@ -757,7 +753,7 @@ func (c *client) start(ctx context.Context, host component.Host) (err error) {
 	}
 	url, _ := c.config.getURL()
 	c.hecWorker = &defaultHecWorker{url, httpClient, buildHTTPHeaders(c.config, c.buildInfo), c.logger}
-	c.heartbeater = newHeartbeater(c.config, c.buildInfo, getPushLogFn(c), c.meter)
+	c.heartbeater = newHeartbeater(c.config, c.buildInfo, getPushLogFn(c), c.telemetrySettings)
 	if c.config.Heartbeat.Startup {
 		if err := c.heartbeater.sendHeartbeat(c.config, c.buildInfo, getPushLogFn(c)); err != nil {
 			return fmt.Errorf("%s: heartbeat on startup failed: %w", c.exporterName, err)

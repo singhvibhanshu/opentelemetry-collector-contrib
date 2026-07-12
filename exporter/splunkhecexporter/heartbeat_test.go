@@ -12,9 +12,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/component"
+	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/otel/attribute"
-	metricnoop "go.opentelemetry.io/otel/metric/noop"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 )
@@ -41,7 +41,9 @@ func createTestConfig(metricsOverrides map[string]string, enableMetrics bool) *C
 
 func initHeartbeater(t *testing.T, metricsOverrides map[string]string, enableMetrics bool, consumeFn func(ctx context.Context, ld plog.Logs) error, mp *sdkmetric.MeterProvider) {
 	config := createTestConfig(metricsOverrides, enableMetrics)
-	hbter := newHeartbeater(config, component.NewDefaultBuildInfo(), consumeFn, mp.Meter("test"))
+	telemetrySettings := componenttest.NewNopTelemetrySettings()
+	telemetrySettings.MeterProvider = mp
+	hbter := newHeartbeater(config, component.NewDefaultBuildInfo(), consumeFn, telemetrySettings)
 	t.Cleanup(func() {
 		hbter.shutdown()
 	})
@@ -87,7 +89,7 @@ func Test_newHeartbeater_disabled(t *testing.T) {
 	config.Heartbeat.Interval = 0
 	hb := newHeartbeater(config, component.NewDefaultBuildInfo(), func(_ context.Context, _ plog.Logs) error {
 		return nil
-	}, metricnoop.NewMeterProvider().Meter("test"))
+	}, componenttest.NewNopTelemetrySettings())
 	assert.Nil(t, hb)
 }
 
