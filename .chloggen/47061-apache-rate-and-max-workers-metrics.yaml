@@ -12,6 +12,13 @@ note: Add `apache.request.rate`, `apache.traffic.rate` (disabled by default), an
 # Mandatory: One or more tracking issues related to the change. You can use the PR number here if no issue exists.
 issues: [47061]
 
+# (Optional) One or more lines of additional information to render under the primary note.
+# These lines will be padded with 2 spaces and then inserted directly into the document.
+# Use pipe (|) for multiline entries.
+subtext: |
+  `apache.worker.limit` is emitted as a non-monotonic cumulative sum (UpDownCounter), since the
+  configured worker slot count can go both up and down across server reconfigurations.
+
 # If your change doesn't affect end users or the exported elements of any package,
 # you should instead start your pull request title with [chore] or use the "Skip Changelog" label.
 # Optional: The change log or logs in which this entry should be included.
