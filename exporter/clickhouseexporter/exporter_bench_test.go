@@ -6,6 +6,7 @@ package clickhouseexporter
 import (
 	"context"
 	"fmt"
+	"io"
 	"testing"
 	"time"
 
@@ -47,6 +48,12 @@ func (noopConn) PrepareBatch(_ context.Context, _ string, _ ...driver.PrepareBat
 	return noopBatch{}, nil
 }
 func (noopConn) Exec(_ context.Context, _ string, _ ...any) error { return nil }
+func (noopConn) QueryFormat(_ context.Context, _ string, _ string, _ ...any) (io.ReadCloser, error) {
+	return nil, nil
+}
+func (noopConn) InsertFormat(_ context.Context, _ string, _ string, _ io.Reader) error {
+	return nil
+}
 func (noopConn) AsyncInsert(_ context.Context, _ string, _ bool, _ ...any) error {
 	return nil
 }
