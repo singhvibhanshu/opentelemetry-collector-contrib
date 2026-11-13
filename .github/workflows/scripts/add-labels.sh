@@ -51,6 +51,47 @@ for LABEL_REQ in ${LABELS}; do
         SHOULD_ADD=false
     fi
 
+    # Only a code owner of a component this PR changes may add the
+    # waiting-for-approvers label by commenting. Triagers, approvers and
+    # maintainers have the access to add it from the UI instead.
+    if [[ "${LABEL}" = "waiting-for-approvers" && ${SHOULD_ADD} = true ]]; then
+        if [[ "${IS_PR:-false}" != "true" ]]; then
+            echo "waiting-for-approvers can only be set on a pull request, skipping."
+            continue
+        fi
+
+        CHANGED_FILES=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${ISSUE}/files" --jq '.[].filename' 2>/dev/null) || CHANGED_FILES=""
+
+        IS_CODE_OWNER=false
+        while IFS= read -r CHANGED_FILE; do
+            [[ -z "${CHANGED_FILE}" ]] && continue
+            # Individual (non-team) owners of the last CODEOWNERS entry matching this file.
+            OWNERS=$(awk -v f="${CHANGED_FILE}" '
+                /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
+                {
+                    pat=$1; sub(/^\//,"",pat); matched=0
+                    if (pat=="*") matched=1
+                    else if (pat ~ /\/$/) { if (substr(f,1,length(pat))==pat) matched=1 }
+                    else { if (f==pat || substr(f,1,length(pat)+1)==pat"/") matched=1 }
+                    if (matched) { owners=""; for (i=2;i<=NF;i++) if ($i !~ /\//) owners=owners" "$i }
+                }
+                END { print owners }
+            ' .github/CODEOWNERS)
+            for OWNER in ${OWNERS}; do
+                if [[ "${OWNER,,}" = "@${SENDER,,}" ]]; then
+                    IS_CODE_OWNER=true
+                    break
+                fi
+            done
+            [[ "${IS_CODE_OWNER}" = true ]] && break
+        done <<< "${CHANGED_FILES}"
+
+        if [[ "${IS_CODE_OWNER}" != true ]]; then
+            echo "${SENDER} is not a code owner of a component changed by this PR, skipping waiting-for-approvers."
+            continue
+        fi
+    fi
+
     if [[ -v COMMON_LABELS["${LABEL}"] ]]; then
         if [[ ${SHOULD_ADD} = true ]]; then
             gh issue edit "${ISSUE}" --add-label "${COMMON_LABELS["${LABEL}"]}"

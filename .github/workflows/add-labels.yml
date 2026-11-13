@@ -28,3 +28,4 @@ jobs:
           ISSUE: ${{ github.event.issue.number }}
           COMMENT: ${{ github.event.comment.body }}
           SENDER: ${{ github.event.sender.login }}
+          IS_PR: ${{ github.event.issue.pull_request != null }}
